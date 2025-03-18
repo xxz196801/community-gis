@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>企业地图管理系统</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Arial', sans-serif;
+            background: #f5f5f5;
+        }
+
+        #map {
+            height: 100vh;
+            z-index: 1;
+        }
+
+        #sidebar {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 350px;
+            background: #ffffff;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        #sidebar.minimized {
+            width: 70px;
+            padding: 15px;
+        }
+
+        .sidebar-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .sidebar-title {
+            font-size: 24px;
+            color: #2c3e50;
+            margin-left: 10px;
+        }
+
+        .sidebar-toggle {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #2c3e50;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar-toggle:hover {
+            transform: scale(1.1);
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #34495e;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            background: #fff;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .btn-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 25px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            border: none;
+        }
+
+        .btn-save {
+            background: linear-gradient(135deg, #6a11cb, #2575fc);
+            color: white;
+        }
+
+        .btn-cancel {
+            background: #ec407a;
+            color: white;
+        }
+
+        .btn-import,
+        .btn-export {
+            background: #3498db;
+            color: white;
+            margin-top: 15px;
+        }
+
+        .company-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border-radius: 8px;
+            margin-top: 25px;
+            padding: 15px;
+            background: #f8f9fa;
+        }
+
+        .company-item {
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #ffffff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .action-btn {
+            background: none;
+            border: none;
+            color: #2c3e50;
+            font-size: 16px;
+            transition: color 0.3s ease;
+            cursor: pointer;
+        }
+
+        .action-btn:hover {
+            color: #2980b9;
+        }
+
+        .document-link {
+            color: #2980b9;
+            text-decoration: none;
+            transition: color 0.3s ease;
+            margin-top: 8px;
+            display: block;
+        }
+
+        .marker-label {
+            background: linear-gradient(135deg, #6a11cb, #2575fc);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        }
+
+        .leaflet-popup-content {
+            font-family: Arial, sans-serif;
+            padding: 15px;
+            border-radius: 8px;
+            background: #ffffff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .company-name {
+            font-size: 18px;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        .company-info {
+            line-height: 1.6;
+            color: #34495e;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <div id="sidebar" draggable="true">
+        <div class="sidebar-header">
+            <div class="flex-start">
+                <i class="fas fa-building" style="font-size: 28px; color: #2980b9;"></i>
+                <h2 class="sidebar-title">企业信息管理</h2>
+            </div>
+            <button class="sidebar-toggle" onclick="toggleSidebar()">
+                <i class="fas fa-compress-arrows-alt"></i>
+            </button>
+        </div>
+
+        <input type="hidden" id="editIndex">
+
+        <div class="form-group">
+            <label>企业名称</label>
+            <input type="text" id="name" required>
+        </div>
+
+        <div class="form-group">
+            <label>地址</label>
+            <input type="text" id="address" required>
+        </div>
+
+        <div class="form-group">
+            <label>行业</label>
+            <input type="text" id="industry" required>
+        </div>
+
+        <div class="form-group">
+            <label>简介</label>
+            <textarea id="description" rows="3" required></textarea>
+        </div>
+
+        <div class="form-group">
+            <label>文档路径</label>
+            <input type="text" id="document" placeholder="docs/company.pdf">
+        </div>
+
+        <div class="form-group">
+            <label>坐标（经度,纬度）</label>
+            <input type="text" id="coordinates" placeholder="例如：116.4074,39.9042" required>
+        </div>
+
+        <div class="btn-container">
+            <button onclick="saveCompany()" class="btn btn-save">保存</button>
+            <button onclick="cancelEdit()" class="btn btn-cancel" id="cancelBtn" style="display: none;">取消</button>
+        </div>
+
+        <div class="btn-container" style="margin-top: 15px;">
+            <button onclick="exportData()" class="btn btn-export">导出数据</button>
+            <label class="btn btn-import">
+                <i class="fas fa-file-import"></i> 导入数据
+                <input type="file" id="importFile" style="display: none;" accept=".json">
+            </label>
+        </div>
+
+        <div class="company-list" id="companyList"></div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/js/all.min.js"></script>
+    <script>
+        const map = L.map('map').setView([30.53510479936762,117.11106880994346], 10);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        let companies = JSON.parse(localStorage.getItem('companies')) || [];
+        let markers = [];
+        let sidebar = document.getElementById('sidebar');
+        let sidebarMinimized = false;
+
+        // 侧边栏拖动功能
+        let dragOffset = { x: 0, y: 0 };
+        sidebar.addEventListener('mousedown', (e) => {
+            dragOffset.x = e.clientX - sidebar.offsetLeft;
+            dragOffset.y = e.clientY - sidebar.offsetTop;
+            document.addEventListener('mousemove', onDrag);
+            document.addEventListener('mouseup', stopDrag);
+        });
+
+        function onDrag(e) {
+            sidebar.style.left = (e.clientX - dragOffset.x) + 'px';
+            sidebar.style.top = (e.clientY - dragOffset.y) + 'px';
+        }
+
+        function stopDrag() {
+            document.removeEventListener('mousemove', onDrag);
+            document.removeEventListener('mouseup', stopDrag);
+        }
+
+        // 最小化功能
+        function toggleSidebar() {
+            sidebar.classList.toggle('minimized');
+            document.getElementById('sidebar-title').style.display =
+                sidebar.classList.contains('minimized') ? 'none' : 'block';
+        }
+
+        // 导入导出功能
+        function exportData() {
+            const data = JSON.stringify(companies);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'companies_data.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        document.getElementById('importFile').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    companies = JSON.parse(e.target.result);
+                    localStorage.setItem('companies', JSON.stringify(companies));
+                    resetMap();
+                    initMap();
+                    initCompanyList();
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        // 初始化函数保持不变
+        function initCompanyList() {
+            const list = document.getElementById('companyList');
+            list.innerHTML = '';
+
+            companies.forEach((company, index) => {
+                const item = document.createElement('div');
+                item.className = 'company-item';
+                item.innerHTML = `
+                    <div>
+                        <div class="company-name">${company.properties.name}</div>
+                        <small>${company.properties.address}</small>
+                    </div>
+                    <div class="action-buttons">
+                        <button class="action-btn edit-btn" onclick="editCompany(${index}, event)">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="action-btn delete-btn" onclick="deleteCompany(${index})">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+
+                item.querySelector('div').onclick = () => {
+                    map.setView(company.geometry.coordinates, 15);
+                    markers[index].openPopup();
+                };
+
+                list.appendChild(item);
+            });
+        }
+
+        function saveCompany() {
+            const editIndex = document.getElementById('editIndex').value;
+            const name = document.getElementById('name').value.trim();
+            const address = document.getElementById('address').value.trim();
+            const industry = document.getElementById('industry').value.trim();
+            const description = document.getElementById('description').value.trim();
+            const documentPath = document.getElementById('document').value.trim();
+            const coordinates = document.getElementById('coordinates').value.split(',').map(Number);
+
+            if (coordinates.length !== 2 || isNaN(coordinates[0]) || isNaN(coordinates[1])) {
+                alert('请输入有效的坐标格式：经度,纬度');
+                return;
+            }
+
+            const companyData = {
+                type: "Feature",
+                properties: {
+                    name,
+                    address,
+                    industry,
+                    description,
+                    document: documentPath
+                },
+                geometry: {
+                    type: "Point",
+                    coordinates: coordinates
+                }
+            };
+
+            if (editIndex) {
+                companies[editIndex] = companyData;
+                localStorage.setItem('companies', JSON.stringify(companies));
+
+                resetMap();
+                initMap();
+                initCompanyList();
+                cancelEdit();
+            } else {
+                const marker = L.marker(coordinates, {
+                    icon: L.divIcon({
+                        className: 'marker-label',
+                        html: `<div>${name}</div>`
+                    })
+                }).addTo(map);
+
+                const popupContent = `
+                    <div class="leaflet-popup-content">
+                        <div class="company-name">${name}</div>
+                        <div class="company-info">
+                            <p>地址：${address}</p>
+                            <p>行业：${industry}</p>
+                            <p>${description}</p>
+                            ${documentPath ? `<a href="${documentPath}" target="_blank" class="document-link">查看文档</a>` : ''}
+                        </div>
+                    </div>
+                `;
+                marker.bindPopup(popupContent).openPopup();
+
+                companies.push(companyData);
+                markers.push(marker);
+                localStorage.setItem('companies', JSON.stringify(companies));
+                initCompanyList();
+            }
+
+            document.getElementById('name').value = '';
+            document.getElementById('address').value = '';
+            document.getElementById('industry').value = '';
+            document.getElementById('description').value = '';
+            document.getElementById('document').value = '';
+            document.getElementById('coordinates').value = '';
+        }
+
+        function editCompany(index, event) {
+            event.stopPropagation();
+
+            const company = companies[index];
+            document.getElementById('editIndex').value = index;
+            document.getElementById('name').value = company.properties.name;
+            document.getElementById('address').value = company.properties.address;
+            document.getElementById('industry').value = company.properties.industry;
+            document.getElementById('description').value = company.properties.description;
+            document.getElementById('document').value = company.properties.document || '';
+            document.getElementById('coordinates').value = company.geometry.coordinates.join(',');
+
+            document.getElementById('cancelBtn').style.display = 'block';
+            document.querySelector('.btn-save').textContent = '更新';
+        }
+
+        function cancelEdit() {
+            document.getElementById('editIndex').value = '';
+            document.getElementById('name').value = '';
+            document.getElementById('address').value = '';
+            document.getElementById('industry').value = '';
+            document.getElementById('description').value = '';
+            document.getElementById('document').value = '';
+            document.getElementById('coordinates').value = '';
+
+            document.getElementById('cancelBtn').style.display = 'none';
+            document.querySelector('.btn-save').textContent = '保存';
+        }
+
+        function deleteCompany(index) {
+            if (confirm('确定要删除该企业信息吗？')) {
+                map.removeLayer(markers[index]);
+                markers.splice(index, 1);
+                companies.splice(index, 1);
+                localStorage.setItem('companies', JSON.stringify(companies));
+                initCompanyList();
+            }
+        }
+
+        function initMap() {
+            markers = companies.map((company, index) => {
+                const marker = L.marker(company.geometry.coordinates, {
+                    icon: L.divIcon({
+                        className: 'marker-label',
+                        html: `<div>${company.properties.name}</div>`
+                    })
+                }).addTo(map);
+
+                const popupContent = `
+                    <div class="leaflet-popup-content">
+                        <div class="company-name">${company.properties.name}</div>
+                        <div class="company-info">
+                            <p>地址：${company.properties.address}</p>
+                            <p>行业：${company.properties.industry}</p>
+                            <p>${company.properties.description}</p>
+                            ${company.properties.document ? `<a href="${company.properties.document}" target="_blank" class="document-link">查看文档</a>` : ''}
+                        </div>
+                    </div>
+                `;
+                marker.bindPopup(popupContent);
+                return marker;
+            });
+        }
+
+        function resetMap() {
+            map.eachLayer(layer => {
+                if (layer instanceof L.Marker) {
+                    map.removeLayer(layer);
+                }
+            });
+            markers = [];
+        }
+
+        function init() {
+            initMap();
+            initCompanyList();
+        }
+
+        init();
+    </script>
+</body>
+</html>
